@@ -1,3 +1,5 @@
+package etsmtl.gti785;
+
 
 
 // This class is for storing axis-aligned boxes.

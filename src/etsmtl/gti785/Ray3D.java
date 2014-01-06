@@ -1,3 +1,5 @@
+package etsmtl.gti785;
+
 
 public class Ray3D {
 	public Point3D origin = new Point3D();

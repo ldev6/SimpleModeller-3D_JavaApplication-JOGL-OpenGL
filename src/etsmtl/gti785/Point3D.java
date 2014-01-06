@@ -1,3 +1,5 @@
+package etsmtl.gti785;
+
 
 public class Point3D {
 

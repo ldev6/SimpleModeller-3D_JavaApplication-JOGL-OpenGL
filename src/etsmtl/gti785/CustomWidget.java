@@ -1,3 +1,5 @@
+package etsmtl.gti785;
+
 
 import javax.media.opengl.GL;
 import com.sun.opengl.util.GLUT;

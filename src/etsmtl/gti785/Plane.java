@@ -1,3 +1,5 @@
+package etsmtl.gti785;
+
 
 public class Plane {
 	Vector3D n = new Vector3D(); // the normal to the plane
