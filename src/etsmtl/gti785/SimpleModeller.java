@@ -1,39 +1,39 @@
 package etsmtl.gti785;
 
 
-import java.lang.Math;
-import java.util.Vector;
-
-import java.awt.Container;
+import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
+import java.awt.Container;
 import java.awt.Dimension;
-
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
-import java.awt.event.MouseEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.ActionEvent;
-import java.awt.BorderLayout;
-
-import javax.swing.JFrame;
-import javax.swing.JPanel;
-import javax.swing.JMenuBar;
-import javax.swing.JMenu;
-import javax.swing.JMenuItem;
-import javax.swing.JCheckBox;
-import javax.swing.JButton;
-import javax.swing.JOptionPane;
-import javax.swing.SwingUtilities;
-import javax.swing.BoxLayout;
+import java.util.ArrayList;
+import java.util.Vector;
 
 import javax.media.opengl.GL;
+import javax.media.opengl.GLAutoDrawable;
 import javax.media.opengl.GLCanvas;
 import javax.media.opengl.GLCapabilities;
-import javax.media.opengl.GLAutoDrawable;
-// import javax.media.opengl.GLDrawableFactory;
 import javax.media.opengl.GLEventListener;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 
 import com.sun.opengl.util.GLUT;
+// import javax.media.opengl.GLDrawableFactory;
 
 
 class ColoredBox {
@@ -144,6 +144,13 @@ class Scene {
 			return coloredBoxes.elementAt(index).isSelected;
 		return false;
 	}
+	
+	public void deselectBoxes(){
+		for(int i = 0; i < coloredBoxes.size(); i++){
+			setSelectionStateOfBox(i, false);
+		}
+	}
+	
 	public void setSelectionStateOfBox( int index, boolean state ) {
 		if ( 0 <= index && index < coloredBoxes.size() )
 			coloredBoxes.elementAt(index).isSelected = state;
@@ -155,12 +162,14 @@ class Scene {
 		}
 	}
 
-	public void setColorOfBox( int index, float r, float g, float b ) {
+	public void setColorOfBox( int index, float r, float g, float b, float a ) {
 		if ( 0 <= index && index < coloredBoxes.size() ) {
 			ColoredBox cb = coloredBoxes.elementAt(index);
 			cb.r = r;
 			cb.g = g;
 			cb.b = b;
+			cb.a = a;
+			boolean ok = true;
 		}
 	}
 
@@ -194,6 +203,19 @@ class Scene {
 
 			isBoundingBoxOfSceneDirty = true;
 		}
+	}
+	
+	public ArrayList<ColoredBox> getSelectedBoxes(){
+		ArrayList<ColoredBox> boxes = new ArrayList<ColoredBox>();
+		
+		for ( int i = 0; i < coloredBoxes.size(); ++i ) {
+			ColoredBox cb = coloredBoxes.elementAt(i);
+			if ( cb.isSelected ){
+				boxes.add(cb);
+			}
+		}
+		
+		return boxes;
 	}
 
 	public void deleteBox( int index ) {
@@ -296,7 +318,8 @@ class Scene {
 	public void drawScene(
 		GL gl,
 		int indexOfHilitedBox, // -1 for none
-		boolean useAlphaBlending
+		boolean useAlphaBlending,
+		boolean useWireFrame
 	) {
 		if ( useAlphaBlending ) {
 			gl.glDisable(GL.GL_DEPTH_TEST);
@@ -310,7 +333,13 @@ class Scene {
 				gl.glColor4f( cb.r, cb.g, cb.b, cb.a );
 			else
 				gl.glColor3f( cb.r, cb.g, cb.b );
-			drawBox( gl, cb.box, false, false, false );
+			
+			if(useWireFrame){
+				drawBox( gl, cb.box, false, true, false );
+			}
+			else{
+				drawBox( gl, cb.box, false, false, false );
+			}
 		}
 		if ( useAlphaBlending ) {
 			gl.glDisable( GL.GL_BLEND );
@@ -361,17 +390,24 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 	private static final int COMMAND_COLOR_GREEN = 3;
 	private static final int COMMAND_COLOR_BLUE = 4;
 	private static final int COMMAND_DELETE = 5;
+	private static final int COMMAND_CHANGE_COLOR = 8;
 
 	public boolean displayWorldAxes = false;
 	public boolean displayCameraTarget = false;
 	public boolean displayBoundingBox = false;
 	public boolean enableCompositing = false;
+	public boolean enableWireframe = false;
 
 	int mouse_x, mouse_y, old_mouse_x, old_mouse_y;
+	
+	private SimpleModeller sm;
 
-	public SceneViewer( GLCapabilities caps ) {
+	public SceneViewer( GLCapabilities caps, SimpleModeller sm ) {
 
 		super( caps );
+		
+		this.sm = sm;
+		
 		addGLEventListener(this);
 
 		addMouseListener( this );
@@ -379,11 +415,13 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 
 		radialMenu.setItemLabelAndID( RadialMenuWidget.CENTRAL_ITEM, "", COMMAND_CREATE_BOX );
 		radialMenu.setItemLabelAndID( 1, "Create Box", COMMAND_CREATE_BOX );
-		radialMenu.setItemLabelAndID( 2, "Set Color to Red", COMMAND_COLOR_RED );
-		radialMenu.setItemLabelAndID( 3, "Set Color to Yellow", COMMAND_COLOR_YELLOW );
-		radialMenu.setItemLabelAndID( 4, "Set Color to Green", COMMAND_COLOR_GREEN );
-		radialMenu.setItemLabelAndID( 5, "Set Color to Blue", COMMAND_COLOR_BLUE );
+//		radialMenu.setItemLabelAndID( 2, "Set Color to Red", COMMAND_COLOR_RED );
+//		radialMenu.setItemLabelAndID( 3, "Set Color to Yellow", COMMAND_COLOR_YELLOW );
+//		radialMenu.setItemLabelAndID( 4, "Set Color to Green", COMMAND_COLOR_GREEN );
+//		radialMenu.setItemLabelAndID( 5, "Set Color to Blue", COMMAND_COLOR_BLUE );
 		radialMenu.setItemLabelAndID( 7, "Delete Box", COMMAND_DELETE );
+		
+		radialMenu.setItemLabelAndID( 8, "Change Color", COMMAND_CHANGE_COLOR );
 
 		camera.setSceneRadius( (float)Math.max(
 			5 * ColoredBox.DEFAULT_SIZE,
@@ -409,6 +447,7 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 		);
 		if ( indexOfSelectedBox >= 0 ) {
 			ColoredBox cb = scene.coloredBoxes.elementAt(indexOfSelectedBox);
+			cb.isSelected = true;
 			Point3D centerOfNewBox = Point3D.sum(
 				Point3D.sum(
 					cb.box.getCenter(),
@@ -445,20 +484,100 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 			normalAtSelectedPoint = new Vector3D(1,0,0);
 		}
 		// update selection to be new box
-		scene.setSelectionStateOfBox( indexOfSelectedBox, false );
-		indexOfSelectedBox = scene.coloredBoxes.size() - 1;
-		scene.setSelectionStateOfBox( indexOfSelectedBox, true );
+//		scene.setSelectionStateOfBox( indexOfSelectedBox, false );
+//		indexOfSelectedBox = scene.coloredBoxes.size() - 1;
+//		scene.setSelectionStateOfBox( indexOfSelectedBox, true );
 	}
 
-	public void setColorOfSelection( float r, float g, float b ) {
-		if ( indexOfSelectedBox >= 0 ) {
-			scene.setColorOfBox( indexOfSelectedBox, r, g, b );
+	public void setColorOfSelection( float r, float g, float b, float a ) {
+		if ( scene.coloredBoxes.size() > 0 ) {
+			for(int i = 0; i < scene.coloredBoxes.size(); i++){
+				if(scene.coloredBoxes.get(i).isSelected){
+					scene.setColorOfBox( i, r, g, b, a );
+				}
+			}
+		}
+	}
+	
+	public void showColorPanel(boolean isVisible){
+		ArrayList<ColoredBox> boxes = scene.getSelectedBoxes();
+		if(boxes.size() > 0){
+			sm.getRedText().setText((int)(boxes.get(0).r * 256) + "");
+			sm.getGreenText().setText((int)(boxes.get(0).g * 256) + "");
+			sm.getBlueText().setText((int)(boxes.get(0).b * 256) + "");
+			sm.getAlphaText().setText(boxes.get(0).a + "");
+			sm.getColorPanel().setVisible(isVisible);
+		}
+		else{
+			sm.getColorPanel().setVisible(false);
+		}
+	}
+	
+	public void changeColor(){
+		boolean ok = true;
+		float red = 0;
+		float green = 0;
+		float blue = 0;
+		float alpha = 0;
+		try{
+			red = Float.parseFloat(sm.getRedText().getText().trim()) / 256;
+			green = Float.parseFloat(sm.getGreenText().getText().trim()) / 256;
+			blue = Float.parseFloat(sm.getBlueText().getText().trim()) / 256;
+			alpha = Float.parseFloat(sm.getAlphaText().getText().trim());
+			
+			if(red < 0){
+				red = 0;
+			}
+			if(red > 1){
+				red = 1;
+			}
+			
+			if(green < 0){
+				green = 0;
+			}
+			if(green > 1){
+				green = 1;
+			}
+			
+			if(blue < 0){
+				blue = 0;
+			}
+			if(blue > 1){
+				blue = 1;
+			}
+			
+			if(alpha < 0){
+				alpha = 0;
+			}
+			if(alpha > 1){
+				alpha = 1;
+			}
+		}catch(Exception e){
+			ok = false;
+		}
+		
+		if(ok){
+			setColorOfSelection(red, green, blue, alpha);
+			repaint();
+			showColorPanel(false);
+		}
+		else{
+			JOptionPane.showMessageDialog(null, "Invalid data. Please correct your data before sumbiting.");
 		}
 	}
 
 	public void deleteSelection() {
-		if ( indexOfSelectedBox >= 0 ) {
-			scene.deleteBox( indexOfSelectedBox );
+		ArrayList<ColoredBox> boxes = new ArrayList<ColoredBox>();
+		for(int i = 0; i < scene.coloredBoxes.size(); i++){
+			boxes.add(((Vector<ColoredBox>)scene.coloredBoxes.clone()).get(i));
+		}
+		
+		for(int i = boxes.size() - 1; i >= 0; i--){
+			if(boxes.get(i).isSelected){
+				scene.deleteBox( i );
+			}
+		}
+		if ( boxes.size() > 0 ) {
 			indexOfSelectedBox = -1;
 			indexOfHilitedBox = -1;
 		}
@@ -524,7 +643,7 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 		gl.glDisable( GL.GL_LIGHTING );
 		gl.glShadeModel( GL.GL_FLAT );
 
-		scene.drawScene( gl, indexOfHilitedBox, enableCompositing );
+		scene.drawScene( gl, indexOfHilitedBox, enableCompositing, enableWireframe );
 
 		if ( displayWorldAxes ) {
 			gl.glBegin( GL.GL_LINES );
@@ -559,6 +678,13 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 			radialMenu.draw( gl, glut, getWidth(), getHeight() );
 		}
 
+		//repere de la face sélectionnee
+		gl.glColor3f( 1, 0, 0 );
+		gl.glBegin( GL.GL_LINES );
+			gl.glVertex3f(selectedPoint.x(), selectedPoint.y(), selectedPoint.z());
+			gl.glVertex3f(normalAtSelectedPoint.x(), normalAtSelectedPoint.y(), normalAtSelectedPoint.z());
+		gl.glEnd();
+		
 		// gl.glFlush(); // I don't think this is necessary
 	}
 
@@ -597,15 +723,31 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 
 		updateHiliting();
 
-		if ( SwingUtilities.isLeftMouseButton(e) && !e.isControlDown() ) {
-			if ( indexOfSelectedBox >= 0 )
-				// de-select the old box
-				scene.setSelectionStateOfBox( indexOfSelectedBox, false );
+		if( SwingUtilities.isLeftMouseButton(e) && e.isShiftDown() && !e.isControlDown() && !e.isAltDown()){
+			if ( indexOfHilitedBox >= 0  && indexOfHilitedBox < scene.coloredBoxes.size()) {
+				scene.toggleSelectionStateOfBox( indexOfHilitedBox );
+			}
+			repaint();
+		}
+		else if ( SwingUtilities.isLeftMouseButton(e) && !e.isControlDown() && !e.isAltDown() ) {
+			if ( indexOfSelectedBox >= 0 ){
+				scene.deselectBoxes();
+			}
 			indexOfSelectedBox = indexOfHilitedBox;
 			selectedPoint.copy( hilitedPoint );
 			normalAtSelectedPoint.copy( normalAtHilitedPoint );
+			
+			
+			
 			if ( indexOfSelectedBox >= 0 ) {
 				scene.setSelectionStateOfBox( indexOfSelectedBox, true );
+				
+				if(sm.getColorPanel().isVisible() == true){
+					showColorPanel(true);
+				}
+			}
+			else{
+				showColorPanel(false);
 			}
 			repaint();
 		}
@@ -625,20 +767,23 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 			case COMMAND_CREATE_BOX :
 				createNewBox();
 				break;
-			case COMMAND_COLOR_RED :
-				setColorOfSelection( 1, 0, 0 );
-				break;
-			case COMMAND_COLOR_YELLOW :
-				setColorOfSelection( 1, 1, 0 );
-				break;
-			case COMMAND_COLOR_GREEN :
-				setColorOfSelection( 0, 1, 0 );
-				break;
-			case COMMAND_COLOR_BLUE :
-				setColorOfSelection( 0, 0, 1 );
-				break;
+//			case COMMAND_COLOR_RED :
+//				setColorOfSelection( 1, 0, 0, 1 );
+//				break;
+//			case COMMAND_COLOR_YELLOW :
+//				setColorOfSelection( 1, 1, 0, 1 );
+//				break;
+//			case COMMAND_COLOR_GREEN :
+//				setColorOfSelection( 0, 1, 0, 1 );
+//				break;
+//			case COMMAND_COLOR_BLUE :
+//				setColorOfSelection( 0, 0, 1, 1 );
+//				break;
 			case COMMAND_DELETE :
 				deleteSelection();
+				break;
+			case COMMAND_CHANGE_COLOR :
+				showColorPanel(true);
 				break;
 			}
 
@@ -718,7 +863,21 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 					&& plane.intersects( ray2, intersection2, true )
 				) {
 					Vector3D translation = Point3D.diff( intersection2, intersection1 );
-					scene.translateBox( indexOfSelectedBox, translation );
+					Vector<ColoredBox> boxes = scene.coloredBoxes;
+					
+					if(e.isAltDown()){
+						for(int i = 0; i < boxes.size(); i++){
+							if(boxes.get(i).isSelected){
+								scene.translateBox( i, translation );
+							}
+						}
+					}
+					else{
+						scene.translateBox( indexOfSelectedBox, translation );
+					}
+					
+					
+					
 					repaint();
 				}
 			}
@@ -769,7 +928,40 @@ public class SimpleModeller implements ActionListener {
 	JCheckBox displayCameraTargetCheckBox;
 	JCheckBox displayBoundingBoxCheckBox;
 	JCheckBox enableCompositingCheckBox;
+	JCheckBox enableWireFrameCheckBox;
+	
+	private JPanel colorPanel;
+	private JLabel colorTitle;
+	private JLabel redLabel;
+	private JLabel greenLabel;
+	private JLabel blueLabel;
+	private JLabel alphaLabel;
+	private JTextField redText;
+	private JTextField greenText;
+	private JTextField blueText;
+	private JTextField alphaText;
+	private JButton colorButton;
 
+	public JPanel getColorPanel(){
+		return colorPanel;
+	}
+	
+	public JTextField getRedText(){
+		return redText;
+	}
+	
+	public JTextField getGreenText(){
+		return greenText;
+	}
+	
+	public JTextField getBlueText(){
+		return blueText;
+	}
+	
+	public JTextField getAlphaText(){
+		return alphaText;
+	}
+	
 	public void actionPerformed(ActionEvent e) {
 		Object source = e.getSource();
 		if ( source == deleteAllMenuItem ) {
@@ -838,6 +1030,13 @@ public class SimpleModeller implements ActionListener {
 			sceneViewer.enableCompositing = ! sceneViewer.enableCompositing;
 			sceneViewer.repaint();
 		}
+		else if ( source == enableWireFrameCheckBox ) {
+			sceneViewer.enableWireframe = ! sceneViewer.enableWireframe;
+			sceneViewer.repaint();
+		}
+		else if ( source == colorButton ) {
+			sceneViewer.changeColor();
+		}
 	}
 
 
@@ -884,7 +1083,7 @@ public class SimpleModeller implements ActionListener {
 		GLCapabilities caps = new GLCapabilities();
 		caps.setDoubleBuffered(true);
 		caps.setHardwareAccelerated(true);
-		sceneViewer = new SceneViewer(caps);
+		sceneViewer = new SceneViewer(caps, this);
 
 		Container pane = frame.getContentPane();
 		// We used to use a BoxLayout as the layout manager here,
@@ -933,7 +1132,60 @@ public class SimpleModeller implements ActionListener {
 		enableCompositingCheckBox.setAlignmentX( Component.LEFT_ALIGNMENT );
 		enableCompositingCheckBox.addActionListener(this);
 		toolPanel.add( enableCompositingCheckBox );
+		
+		enableWireFrameCheckBox = new JCheckBox("Draw Wireframe Boxes", sceneViewer.enableWireframe );
+		enableWireFrameCheckBox.setAlignmentX( Component.LEFT_ALIGNMENT );
+		enableWireFrameCheckBox.addActionListener(this);
+		toolPanel.add( enableWireFrameCheckBox );
 
+		//COLOR PANEL
+		colorPanel = new JPanel();
+		
+		colorTitle = new JLabel("Color");
+//		colorTitle.setAlignmentX( Component.LEFT_ALIGNMENT );
+		colorPanel.add( colorTitle );
+		
+		redLabel = new JLabel("Red");
+//		redLabel.setAlignmentX( Component.LEFT_ALIGNMENT );
+		colorPanel.add( redLabel );
+		
+		redText = new JTextField(4);
+//		redText.setAlignmentX( Component.LEFT_ALIGNMENT );
+		colorPanel.add( redText );
+		
+		greenLabel = new JLabel("Green");
+//		greenLabel.setAlignmentX( Component.LEFT_ALIGNMENT );
+		colorPanel.add( greenLabel );
+		
+		greenText = new JTextField(4);
+//		greenText.setAlignmentX( Component.LEFT_ALIGNMENT );
+		colorPanel.add( greenText );
+		
+		blueLabel = new JLabel("Blue");
+//		blueLabel.setAlignmentX( Component.LEFT_ALIGNMENT );
+		colorPanel.add( blueLabel );
+		
+		blueText = new JTextField(4);
+//		blueText.setAlignmentX( Component.LEFT_ALIGNMENT );
+		colorPanel.add( blueText );
+		
+		alphaLabel = new JLabel("Alpha");
+//		alphaLabel.setAlignmentX( Component.LEFT_ALIGNMENT );
+		colorPanel.add( alphaLabel );
+		
+		alphaText = new JTextField(4);
+//		alphaText.setAlignmentX( Component.LEFT_ALIGNMENT );
+		colorPanel.add( alphaText );
+		
+		colorButton = new JButton("Apply");
+		colorButton.addActionListener(this);
+//		colorButton.setAlignmentX( Component.CENTER_ALIGNMENT );
+		colorPanel.add( colorButton );
+		
+		colorPanel.setAlignmentX( Component.LEFT_ALIGNMENT );
+		colorPanel.setVisible(false);
+		toolPanel.add( colorPanel );
+		
 		frame.pack();
 		frame.setVisible( true );
 	}
