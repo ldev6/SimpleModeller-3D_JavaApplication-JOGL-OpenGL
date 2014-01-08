@@ -678,13 +678,6 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 			radialMenu.draw( gl, glut, getWidth(), getHeight() );
 		}
 
-		//repere de la face sélectionnee
-		gl.glColor3f( 1, 0, 0 );
-		gl.glBegin( GL.GL_LINES );
-			gl.glVertex3f(selectedPoint.x(), selectedPoint.y(), selectedPoint.z());
-			gl.glVertex3f(normalAtSelectedPoint.x(), normalAtSelectedPoint.y(), normalAtSelectedPoint.z());
-		gl.glEnd();
-		
 		// gl.glFlush(); // I don't think this is necessary
 	}
 
@@ -713,14 +706,6 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 		mouse_x = e.getX();
 		mouse_y = e.getY();
 
-		if ( radialMenu.isVisible() || (SwingUtilities.isRightMouseButton(e) && !e.isShiftDown() && !e.isControlDown()) ) {
-			int returnValue = radialMenu.pressEvent( mouse_x, mouse_y );
-			if ( returnValue == CustomWidget.S_REDRAW )
-				repaint();
-			if ( returnValue != CustomWidget.S_EVENT_NOT_CONSUMED )
-				return;
-		}
-
 		updateHiliting();
 
 		if( SwingUtilities.isLeftMouseButton(e) && e.isShiftDown() && !e.isControlDown() && !e.isAltDown()){
@@ -729,15 +714,13 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 			}
 			repaint();
 		}
-		else if ( SwingUtilities.isLeftMouseButton(e) && !e.isControlDown() && !e.isAltDown() ) {
+		else if ( (SwingUtilities.isLeftMouseButton(e) || SwingUtilities.isRightMouseButton(e)) && !e.isControlDown() && !e.isAltDown() ) {
 			if ( indexOfSelectedBox >= 0 ){
 				scene.deselectBoxes();
 			}
 			indexOfSelectedBox = indexOfHilitedBox;
 			selectedPoint.copy( hilitedPoint );
 			normalAtSelectedPoint.copy( normalAtHilitedPoint );
-			
-			
 			
 			if ( indexOfSelectedBox >= 0 ) {
 				scene.setSelectionStateOfBox( indexOfSelectedBox, true );
@@ -750,6 +733,14 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 				showColorPanel(false);
 			}
 			repaint();
+		}
+		
+		if ( radialMenu.isVisible() || (SwingUtilities.isRightMouseButton(e) && !e.isShiftDown() && !e.isControlDown()) ) {
+			int returnValue = radialMenu.pressEvent( mouse_x, mouse_y );
+			if ( returnValue == CustomWidget.S_REDRAW )
+				repaint();
+			if ( returnValue != CustomWidget.S_EVENT_NOT_CONSUMED )
+				return;
 		}
 	}
 
