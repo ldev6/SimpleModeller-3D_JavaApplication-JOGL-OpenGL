@@ -1,9 +1,10 @@
 package etsmtl.gti785;
 
 
+import java.io.Serializable;
 import java.lang.Math;
 
-public class Vector3D {
+public class Vector3D implements Serializable {
 
 	public float [] v = new float[3];
 

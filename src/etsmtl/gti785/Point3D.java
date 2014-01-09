@@ -1,7 +1,9 @@
 package etsmtl.gti785;
 
+import java.io.Serializable;
 
-public class Point3D {
+
+public class Point3D implements Serializable{
 
 	public float [] p = new float[3];
 

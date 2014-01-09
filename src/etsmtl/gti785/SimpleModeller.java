@@ -2,7 +2,6 @@ package etsmtl.gti785;
 
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Dimension;
@@ -11,6 +10,16 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.ObjectInput;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutput;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Vector;
 
@@ -401,7 +410,7 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 	int mouse_x, mouse_y, old_mouse_x, old_mouse_y;
 	
 	private SimpleModeller sm;
-
+	
 	public SceneViewer( GLCapabilities caps, SimpleModeller sm ) {
 
 		super( caps );
@@ -428,7 +437,6 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 			scene.getBoundingBoxOfScene().getDiagonal().length() * 0.5f
 		) );
 		camera.reset();
-
 	}
 	public Dimension getPreferredSize() {
 		return new Dimension( 512, 512 );
@@ -602,6 +610,33 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 			scene.getBoundingBoxOfScene().getDiagonal().length() * 0.5f
 		) );
 		camera.reset();
+	}
+	
+	public void saveCamera(){
+		CameraState cam = new CameraState(camera.position, camera.target, camera.up);
+		sm.getListCams().add(cam);
+		
+		try{
+			//use buffering
+			OutputStream file = new FileOutputStream("cams.txt");
+			OutputStream buffer = new BufferedOutputStream(file);
+			ObjectOutput output = new ObjectOutputStream(buffer);
+			try{
+				output.writeObject(sm.getListCams());
+			}
+			finally{
+				output.close();
+			}
+		}  
+		catch(Exception ex){}
+		
+		sm.generateMenu();
+	}
+	
+	public void loadCamera(int index){
+		camera.position = ((CameraState)sm.getListCams().get(index)).getPosition();
+		camera.target = ((CameraState)sm.getListCams().get(index)).getTarget();
+		camera.up = ((CameraState)sm.getListCams().get(index)).getUp();
 	}
 
 	public void init( GLAutoDrawable drawable ) {
@@ -910,7 +945,9 @@ public class SimpleModeller implements ActionListener {
 	Container toolPanel;
 	SceneViewer sceneViewer;
 
-	JMenuItem deleteAllMenuItem, quitMenuItem, aboutMenuItem;
+	JMenuBar menuBar;
+	JMenu editMenu;
+	JMenuItem deleteAllMenuItem, quitMenuItem, aboutMenuItem, saveCamMenuItem;
 	JButton createBoxButton;
 	JButton deleteSelectionButton;
 	JButton lookAtSelectionButton;
@@ -933,6 +970,9 @@ public class SimpleModeller implements ActionListener {
 	private JTextField alphaText;
 	private JButton colorButton;
 
+	private ArrayList<CameraState> listCams = new ArrayList<CameraState>();
+	private ArrayList<JMenuItem> camMenuItems = new ArrayList<JMenuItem>();
+	
 	public JPanel getColorPanel(){
 		return colorPanel;
 	}
@@ -989,6 +1029,9 @@ public class SimpleModeller implements ActionListener {
 				JOptionPane.INFORMATION_MESSAGE
 			);
 		}
+		else if ( source == saveCamMenuItem ) {
+			sceneViewer.saveCamera();
+		}
 		else if ( source == createBoxButton ) {
 			sceneViewer.createNewBox();
 			sceneViewer.repaint();
@@ -1028,6 +1071,14 @@ public class SimpleModeller implements ActionListener {
 		else if ( source == colorButton ) {
 			sceneViewer.changeColor();
 		}
+		else{
+			for(int i = 0; i < camMenuItems.size(); i++){
+				if(source == camMenuItems.get(i)){
+					sceneViewer.loadCamera(i);
+					sceneViewer.repaint();
+				}
+			}
+		}
 	}
 
 
@@ -1044,25 +1095,8 @@ public class SimpleModeller implements ActionListener {
 		frame = new JFrame( applicationName );
 		frame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
 
-		JMenuBar menuBar = new JMenuBar();
-			JMenu menu = new JMenu("File");
-				deleteAllMenuItem = new JMenuItem("Delete All");
-				deleteAllMenuItem.addActionListener(this);
-				menu.add(deleteAllMenuItem);
-
-				menu.addSeparator();
-
-				quitMenuItem = new JMenuItem("Quit");
-				quitMenuItem.addActionListener(this);
-				menu.add(quitMenuItem);
-			menuBar.add(menu);
-			menu = new JMenu("Help");
-				aboutMenuItem = new JMenuItem("About");
-				aboutMenuItem.addActionListener(this);
-				menu.add(aboutMenuItem);
-			menuBar.add(menu);
-		frame.setJMenuBar(menuBar);
-
+		generateMenu();
+		
 		toolPanel = new JPanel();
 		toolPanel.setLayout( new BoxLayout( toolPanel, BoxLayout.Y_AXIS ) );
 
@@ -1179,6 +1213,74 @@ public class SimpleModeller implements ActionListener {
 		
 		frame.pack();
 		frame.setVisible( true );
+	}
+	
+	public void generateMenu(){
+		menuBar = new JMenuBar();
+		JMenu menu = new JMenu("File");
+			deleteAllMenuItem = new JMenuItem("Delete All");
+			deleteAllMenuItem.addActionListener(this);
+			menu.add(deleteAllMenuItem);
+
+			menu.addSeparator();
+
+			quitMenuItem = new JMenuItem("Quit");
+			quitMenuItem.addActionListener(this);
+			menu.add(quitMenuItem);
+		menuBar.add(menu);
+		menu = new JMenu("Help");
+			aboutMenuItem = new JMenuItem("About");
+			aboutMenuItem.addActionListener(this);
+			menu.add(aboutMenuItem);
+		menuBar.add(menu);
+		
+		editMenu = new JMenu("Edit");
+		saveCamMenuItem = new JMenuItem("Save camera");
+		saveCamMenuItem.addActionListener(this);
+		editMenu.add(saveCamMenuItem);
+		
+		getCamListMenuItems();
+		menuBar.add(editMenu);
+		frame.setJMenuBar(menuBar);
+		frame.getJMenuBar().updateUI();
+	}
+	
+	public void getCamListMenuItems(){
+		try{
+			InputStream file = new FileInputStream("cams.txt");
+		    InputStream buffer = new BufferedInputStream(file);
+		    ObjectInput input = new ObjectInputStream (buffer);
+		    try{
+		    	listCams = (ArrayList<CameraState>)input.readObject();
+		    	camMenuItems = new ArrayList<JMenuItem>();
+		    	
+		    	if(listCams.size() > 0){
+		    		editMenu.addSeparator();
+		    		
+		    		for(int i = 0; i < listCams.size(); i++){
+		    			JMenuItem cam = new JMenuItem("Camera #" + (i + 1));
+		    			camMenuItems.add(cam);
+		    			cam.addActionListener(this);
+		    			editMenu.add(cam);
+		    		}
+		    	}
+		    }
+		    finally{
+		    	input.close();
+		    }
+		}
+		catch(Exception ex){
+			ex.printStackTrace();
+			System.out.println("error reading!");
+		}
+	}
+	
+	public ArrayList<CameraState> getListCams() {
+		return listCams;
+	}
+
+	public void setListCams(ArrayList<CameraState> listCams) {
+		this.listCams = listCams;
 	}
 
 	public static void main( String[] args ) {
