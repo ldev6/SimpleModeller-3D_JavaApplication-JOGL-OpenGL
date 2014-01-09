@@ -741,8 +741,6 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 		mouse_x = e.getX();
 		mouse_y = e.getY();
 
-		updateHiliting();
-
 		if( SwingUtilities.isLeftMouseButton(e) && e.isShiftDown() && !e.isControlDown() && !e.isAltDown()){
 			if ( indexOfHilitedBox >= 0  && indexOfHilitedBox < scene.coloredBoxes.size()) {
 				scene.toggleSelectionStateOfBox( indexOfHilitedBox );
@@ -777,6 +775,8 @@ class SceneViewer extends GLCanvas implements MouseListener, MouseMotionListener
 			if ( returnValue != CustomWidget.S_EVENT_NOT_CONSUMED )
 				return;
 		}
+		
+		updateHiliting();
 	}
 
 	public void mouseReleased( MouseEvent e ) {
